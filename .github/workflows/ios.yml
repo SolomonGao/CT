@@ -1,0 +1,38 @@
+# 无 Mac 工作流：push 到 GitHub 后，云端 macOS 自动完成
+# 工程生成（xcodegen）→ App+Widget 模拟器编译 → 核心库单元测试。
+# 全部无需签名，免费 Apple ID 即可跑通；真机侧载见项目文档"无 Mac 开发环境"一章。
+name: iOS
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-app:
+    name: 编译 App + Widget（模拟器）
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 XcodeGen
+        run: brew install xcodegen
+
+      - name: 生成 .xcodeproj
+        run: xcodegen
+
+      - name: 编译
+        run: |
+          xcodebuild -scheme CTApp \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug \
+            build
+
+  test-core:
+    name: MacroCore 单元测试
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: swift test
+        run: swift test

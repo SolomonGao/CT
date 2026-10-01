@@ -1,0 +1,47 @@
+# XcodeGen 工程定义 —— 无 Mac 工作流的核心：
+# .xcodeproj 由本文件在云端 macOS（GitHub Actions）上生成，Windows 侧只维护文本。
+# 本机修改后无需 Xcode：push 后 CI 自动 xcodegen + 编译验证 App 与 Widget。
+name: CT
+options:
+  bundleIdPrefix: com.ctapp
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+packages:
+  MacroCore:
+    path: .
+
+targets:
+  CTApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources/CTApp
+    dependencies:
+      - package: MacroCore
+        product: MacroCore
+      - target: CTWidget        # 内嵌 Widget Extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ctapp.CT
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        # TODO(P1): 实机分发时配置签名与 App Groups：
+        #   CODE_SIGN_STYLE: Automatic
+        #   DEVELOPMENT_TEAM: <你的 Team ID>
+        #   INFOPLIST_KEY_NSAppGroups: <group.com.ctapp.shared>（或用 entitlements 文件）
+
+  CTWidget:
+    type: appExtension
+    platform: iOS
+    sources:
+      - path: Sources/CTWidget
+    dependencies:
+      - package: MacroCore
+        product: MacroCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ctapp.CT.widget
+        INFOPLIST_FILE: Sources/CTWidget/Info.plist
