@@ -21,32 +21,32 @@ jobs:
       - name: 生成 .xcodeproj
         shell: bash
         run: |
-          xcodegen --version
-          set +e +o pipefail
-          xcodegen --spec project.yml 2>&1 | tee xcodegen.out
-          status=${PIPESTATUS[0]}
-          set -e -o pipefail
+          set +e
+          xcodegen --version > gen.out 2>&1
+          echo "::notice::xcodegen --version exit=${PIPESTATUS[0]} output: $(head -c 200 gen.out | tr -d '\r')"
+          xcodegen --spec project.yml > gen.out 2>&1
+          status=$?
           if [ $status -ne 0 ]; then
-            lines=$(grep -iE "error|invalid|not found|no such|missing" xcodegen.out | head -30)
-            [ -z "$lines" ] && lines=$(tail -30 xcodegen.out)
-            while IFS= read -r line; do echo "::error::${line:0:350}"; done <<< "$lines"
+            echo "::error::xcodegen exit=$status, 输出尾部："
+            tail -40 gen.out | tr -d '\r' | sed 's/%/%25/g' | while IFS= read -r line; do
+              echo "::error::${line:0:300}"
+            done
             exit 1
           fi
 
       - name: 编译
         shell: bash
         run: |
-          set +e +o pipefail
+          set +e
           xcodebuild -scheme CTApp \
             -destination 'generic/platform=iOS Simulator' \
             -configuration Debug \
-            build 2>&1 | tee build.out
-          status=${PIPESTATUS[0]}
-          set -e -o pipefail
+            build > build.out 2>&1
+          status=$?
           if [ $status -ne 0 ]; then
-            lines=$(grep -E "error:" build.out | head -40)
-            [ -z "$lines" ] && lines=$(tail -30 build.out)
-            while IFS= read -r line; do echo "::error::${line:0:350}"; done <<< "$lines"
+            grep -E "error:" build.out | head -40 | tr -d '\r' | sed 's/%/%25/g' | while IFS= read -r line; do
+              echo "::error::${line:0:300}"
+            done
             exit 1
           fi
 
@@ -59,13 +59,12 @@ jobs:
       - name: swift test
         shell: bash
         run: |
-          set +e +o pipefail
-          swift test 2>&1 | tee test.out
-          status=${PIPESTATUS[0]}
-          set -e -o pipefail
+          set +e
+          swift test > test.out 2>&1
+          status=$?
           if [ $status -ne 0 ]; then
-            lines=$(grep -E "error:" test.out | head -40)
-            [ -z "$lines" ] && lines=$(tail -30 test.out)
-            while IFS= read -r line; do echo "::error::${line:0:350}"; done <<< "$lines"
+            grep -E "error:" test.out | head -40 | tr -d '\r' | sed 's/%/%25/g' | while IFS= read -r line; do
+              echo "::error::${line:0:300}"
+            done
             exit 1
           fi
