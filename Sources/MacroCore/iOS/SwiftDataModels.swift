@@ -1,10 +1,12 @@
-// iOS-only：SwiftData 持久层。本文件仅在 Apple 平台编译（#if canImport 保护），
-// Windows/CLI 构建时为空。P1 阶段先给出模型与映射，SwiftDataStore 实现随后接入 App Group 容器。
+// iOS-only：SwiftData 持久层 + 共享容器 + 当日快照加载。
+// 本文件仅在 iOS 编译（#if canImport(UIKit) 保护），Windows/CLI 构建时为空。
+// 数据落在 App Group 共享容器：App 与 Widget Extension 读写同一份数据。
 
 #if canImport(UIKit)
 import Foundation
 import SwiftData
-import MacroCore
+
+// MARK: - SwiftData 实体
 
 @Model
 final class FoodEntryEntity {
@@ -62,7 +64,134 @@ final class MacroGoalEntity {
     }
 }
 
-// TODO(P1): public struct SwiftDataStore: MacroStore —— ModelContainer 指向
-//   FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.<team>.CT")
-//   下的 store.sqlite，保证 App 与 Widget Extension 读写同一份数据。
+// MARK: - 共享容器（App Group）
+
+public enum SharedStore {
+    /// App Group 标识。真机分发前在两端 target 的 entitlements 中开启；
+    /// 上架/签名时需将前缀换成你的 Team ID（如 group.<TEAMID>.ctapp.shared）。
+    public static let appGroupID = "group.com.ctapp.shared"
+
+    public enum StoreError: Error {
+        case appGroupUnavailable   // 无 entitlements（如 CI 模拟器）时容器目录不存在
+    }
+
+    public static func makeContainer() throws -> ModelContainer {
+        guard let dir = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: appGroupID
+        ) else {
+            throw StoreError.appGroupUnavailable
+        }
+        let url = dir.appendingPathComponent("CT.sqlite")
+        let config = ModelConfiguration(url: url)
+        return try ModelContainer(
+            for: FoodEntryEntity.self, MacroGoalEntity.self,
+            configurations: config
+        )
+    }
+}
+
+// MARK: - 当日快照（Widget 与 App 共用的读取入口）
+
+public struct DaySnapshot: Sendable {
+    public var totals: MacroNutrients
+    public var goal: MacroGoal?
+    public static let empty = DaySnapshot(totals: .zero, goal: nil)
+}
+
+public enum TodayLoader {
+    /// 从 App Group 容器读取当日聚合。
+    /// 返回 nil 表示容器不可用（未配 entitlements）；数据为空时返回 .empty 快照。
+    public static func load(calendar: Calendar = .current) -> DaySnapshot? {
+        guard let container = try? SharedStore.makeContainer() else { return nil }
+        let context = ModelContext(container)
+        let start = calendar.startOfDay(for: Date())
+        guard let end = calendar.date(byAdding: .day, value: 1, to: start) else { return .empty }
+
+        do {
+            var entryDescriptor = FetchDescriptor<FoodEntryEntity>(
+                predicate: #Predicate { $0.timestamp >= start && $0.timestamp < end }
+            )
+            entryDescriptor.sortBy = [SortDescriptor(\.timestamp)]
+            let totals = try context.fetch(entryDescriptor)
+                .reduce(MacroNutrients.zero) { $0 + $1.record.macros }
+
+            let goalDescriptor = FetchDescriptor<MacroGoalEntity>(
+                predicate: #Predicate { $0.day == start }
+            )
+            let goal = try context.fetch(goalDescriptor).first?.goal
+            return DaySnapshot(totals: totals, goal: goal)
+        } catch {
+            return .empty
+        }
+    }
+}
+
+// MARK: - MacroStore 的 SwiftData 实现（App 侧写入）
+
+/// App 主进程使用的持久化 Store。@MainActor 隔离，跨 actor 访问全部经由 async 协议方法串行化。
+@MainActor
+public final class SwiftDataStore {
+    public static let shared = SwiftDataStore()
+
+    private let container: ModelContainer
+    private var context: ModelContext { container.mainContext }
+
+    private init() {
+        if let shared = try? SharedStore.makeContainer() {
+            container = shared
+        } else {
+            // 无 App Group（如模拟器未配 entitlements）：退化为仅内存容器，保证 App 可用。
+            container = try! ModelContainer(for: FoodEntryEntity.self, MacroGoalEntity.self)
+        }
+    }
+}
+
+extension SwiftDataStore: @unchecked Sendable {}
+
+extension SwiftDataStore: MacroStore {
+    public func addEntry(_ entry: FoodEntryRecord) async throws {
+        context.insert(FoodEntryEntity(record: entry))
+        try context.save()
+    }
+
+    public func deleteEntry(id: UUID) async throws {
+        let descriptor = FetchDescriptor<FoodEntryEntity>(
+            predicate: #Predicate { $0.id == id }
+        )
+        guard let entity = try context.fetch(descriptor).first else { return }
+        context.delete(entity)
+        try context.save()
+    }
+
+    public func entries(from start: Date, to end: Date) async throws -> [FoodEntryRecord] {
+        var descriptor = FetchDescriptor<FoodEntryEntity>(
+            predicate: #Predicate { $0.timestamp >= start && $0.timestamp < end }
+        )
+        descriptor.sortBy = [SortDescriptor(\.timestamp)]
+        return try context.fetch(descriptor).map(\.record)
+    }
+
+    public func setGoal(_ goal: MacroGoal, for day: Date) async throws {
+        let key = Calendar.current.startOfDay(for: day)
+        let descriptor = FetchDescriptor<MacroGoalEntity>(
+            predicate: #Predicate { $0.day == key }
+        )
+        if let existing = try context.fetch(descriptor).first {
+            existing.proteinTarget = goal.proteinTarget
+            existing.carbsTarget = goal.carbsTarget
+            existing.fatTarget = goal.fatTarget
+        } else {
+            context.insert(MacroGoalEntity(day: key, goal: goal))
+        }
+        try context.save()
+    }
+
+    public func goal(for day: Date) async throws -> MacroGoal? {
+        let key = Calendar.current.startOfDay(for: day)
+        let descriptor = FetchDescriptor<MacroGoalEntity>(
+            predicate: #Predicate { $0.day == key }
+        )
+        return try context.fetch(descriptor).first?.goal
+    }
+}
 #endif

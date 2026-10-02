@@ -26,10 +26,11 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ctapp.CT
         INFOPLIST_FILE: Sources/CTApp/Info.plist
-        # TODO(P1): 实机分发时配置签名与 App Groups：
+        CODE_SIGN_ENTITLEMENTS: Sources/CTApp/CT.entitlements
+        # TODO(P1): 实机分发时配置签名（App Groups 标识需换成你 Team ID 前缀）：
         #   CODE_SIGN_STYLE: Automatic
         #   DEVELOPMENT_TEAM: <你的 Team ID>
-        #   INFOPLIST_KEY_NSAppGroups: <group.com.ctapp.shared>（或用 entitlements 文件）
+        #   group.com.ctapp.shared → group.<TEAMID>.ctapp.shared（三处：两处 entitlements + SwiftDataModels.swift）
 
   CTWidget:
     type: app-extension
@@ -43,3 +44,4 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ctapp.CT.widget
         INFOPLIST_FILE: Sources/CTWidget/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Sources/CTWidget/CTWidget.entitlements

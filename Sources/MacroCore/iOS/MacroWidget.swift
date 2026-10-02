@@ -26,13 +26,18 @@ public struct MacroEntry: TimelineEntry {
 public struct MacroTimelineProvider: TimelineProvider {
     public init() {}
 
-    // TODO(P1): 从 App Group 容器（SwiftDataStore）读取当日聚合结果。
-    //           数据未就位前返回占位快照，保证 Widget 永不黑屏。
+    /// 未设目标时的展示用默认值，避免新用户看到满屏 0/0。
+    private static let starterGoal = MacroGoal(proteinTarget: 120, carbsTarget: 250, fatTarget: 60)
+
     private func snapshotEntry() -> MacroEntry {
-        MacroEntry(
+        // 从 App Group 共享容器读取当日聚合；容器不可用（如 CI 模拟器）时回退占位。
+        guard let snapshot = TodayLoader.load() else {
+            return MacroEntry(date: Date(), totals: .zero, goal: Self.starterGoal)
+        }
+        return MacroEntry(
             date: Date(),
-            totals: .zero,
-            goal: MacroGoal(proteinTarget: 120, carbsTarget: 250, fatTarget: 60)
+            totals: snapshot.totals,
+            goal: snapshot.goal ?? Self.starterGoal
         )
     }
 
