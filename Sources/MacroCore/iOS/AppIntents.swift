@@ -10,8 +10,8 @@ import MacroCore
 /// 管道B（参数化语音）："记 30 克蛋白质" —— 不经过 LLM，零成本零延迟。
 /// 全中国可用（老 Siri + Shortcuts 即可）。
 struct LogMacroIntent: AppIntent {
-    static var title: LocalizedStringResource = "记录营养素"
-    static var description = IntentDescription("直接记录一项营养素的克数，无需打开 App。")
+    static var title: LocalizedStringResource { "记录营养素" }
+    static var description: IntentDescription { IntentDescription("直接记录一项营养素的克数，无需打开 App。") }
 
     @Parameter(title: "蛋白质（克）")
     var protein: Double?
