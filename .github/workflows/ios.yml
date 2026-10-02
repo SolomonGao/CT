@@ -1,6 +1,6 @@
 # 无 Mac 工作流：push 到 GitHub 后，云端 macOS 自动完成
 # 工程生成（xcodegen）→ App+Widget 模拟器编译 → 核心库单元测试。
-# 全部无需签名，免费 Apple ID 即可跑通；真机侧载见项目文档"无 Mac 开发环境"一章。
+# 失败时把错误行以 ::error:: 输出，转为公开可读的 check 注解，便于远程诊断。
 name: iOS
 
 on:
@@ -21,14 +21,26 @@ jobs:
       - name: 生成 .xcodeproj
         run: |
           xcodegen --version
-          xcodegen --spec project.yml
+          xcodegen --spec project.yml 2>&1 | tee xcodegen.out
+          if [ ${PIPESTATUS[0]} -ne 0 ]; then
+            grep -iE "error|invalid|not found|no such" xcodegen.out | head -30 | while IFS= read -r line; do
+              echo "::error::${line:0:350}"
+            done
+            exit 1
+          fi
 
       - name: 编译
         run: |
           xcodebuild -scheme CTApp \
             -destination 'generic/platform=iOS Simulator' \
             -configuration Debug \
-            build
+            build 2>&1 | tee build.out
+          if [ ${PIPESTATUS[0]} -ne 0 ]; then
+            grep -E "error:" build.out | head -40 | while IFS= read -r line; do
+              echo "::error::${line:0:350}"
+            done
+            exit 1
+          fi
 
   test-core:
     name: MacroCore 单元测试
@@ -37,4 +49,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: swift test
-        run: swift test
+        run: |
+          swift test 2>&1 | tee test.out
+          if [ ${PIPESTATUS[0]} -ne 0 ]; then
+            grep -E "error:|failed" test.out | head -40 | while IFS= read -r line; do
+              echo "::error::${line:0:350}"
+            done
+            exit 1
+          fi
