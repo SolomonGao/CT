@@ -1,7 +1,7 @@
 // iOS-only：SwiftData 持久层。本文件仅在 Apple 平台编译（#if canImport 保护），
 // Windows/CLI 构建时为空。P1 阶段先给出模型与映射，SwiftDataStore 实现随后接入 App Group 容器。
 
-#if canImport(SwiftData)
+#if canImport(UIKit)
 import Foundation
 import SwiftData
 import MacroCore

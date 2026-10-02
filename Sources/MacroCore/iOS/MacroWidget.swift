@@ -3,7 +3,7 @@
 // 注意：@main WidgetBundle 在 CTWidget Extension Target 中（Sources/CTWidget），
 // 此处只提供 Provider、Entry 与视图，供 Extension 复用。
 
-#if canImport(WidgetKit)
+#if canImport(UIKit)
 import SwiftUI
 import WidgetKit
 import MacroCore

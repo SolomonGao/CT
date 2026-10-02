@@ -2,7 +2,7 @@
 // 本文件仅在 Apple 平台编译，Windows/CLI 构建时为空。
 // 注意：库中不提供 @main，Xcode App Target 中写 @main struct CTApp: App { ... }。
 
-#if canImport(SwiftUI)
+#if canImport(UIKit)
 import SwiftUI
 import MacroCore
 

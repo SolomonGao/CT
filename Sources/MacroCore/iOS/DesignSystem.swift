@@ -1,7 +1,7 @@
 // iOS-only：设计系统。三营养素固定色码，全 App / 全 Widget 一致（项目文档 §7.1）。
 // 本文件仅在 Apple 平台编译，Windows/CLI 构建时为空。
 
-#if canImport(SwiftUI)
+#if canImport(UIKit)
 import SwiftUI
 import MacroCore
 

@@ -2,7 +2,7 @@
 // 同一个 Intent 同时供 Widget 按钮、控制中心、Siri、Shortcuts 复用。
 // 本文件仅在 Apple 平台编译，Windows/CLI 构建时为空。
 
-#if canImport(AppIntents)
+#if canImport(UIKit)
 import AppIntents
 import WidgetKit
 import MacroCore
