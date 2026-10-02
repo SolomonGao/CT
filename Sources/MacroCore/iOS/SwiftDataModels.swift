@@ -76,12 +76,18 @@ public enum SharedStore {
     }
 
     public static func makeContainer() throws -> ModelContainer {
-        guard let dir = FileManager.default.containerURL(
+        let url: URL
+        if let dir = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: appGroupID
-        ) else {
-            throw StoreError.appGroupUnavailable
+        ) {
+            // 正常路径：App Group 共享容器，App 与 Widget 读写同一份数据。
+            url = dir.appendingPathComponent("CT.sqlite")
+        } else {
+            // 降级路径：无 App Groups（侧载未配 Team ID / CI 模拟器）时用本进程沙盒。
+            // 数据持久但仅本进程可见——App 可用，Widget 显示占位。
+            let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            url = support.appendingPathComponent("CT.sqlite")
         }
-        let url = dir.appendingPathComponent("CT.sqlite")
         let config = ModelConfiguration(url: url)
         return try ModelContainer(
             for: FoodEntryEntity.self, MacroGoalEntity.self,
@@ -137,12 +143,8 @@ public final class SwiftDataStore {
     private var context: ModelContext { container.mainContext }
 
     private init() {
-        if let shared = try? SharedStore.makeContainer() {
-            container = shared
-        } else {
-            // 无 App Group（如模拟器未配 entitlements）：退化为仅内存容器，保证 App 可用。
-            container = try! ModelContainer(for: FoodEntryEntity.self, MacroGoalEntity.self)
-        }
+        // 正常路径 App Group；无 entitlements（侧载未配 Team ID）时自动降级到本进程沙盒。
+        container = try! SharedStore.makeContainer()
     }
 }
 

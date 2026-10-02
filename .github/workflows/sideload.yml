@@ -1,0 +1,73 @@
+# 侧载构建：在云端 macOS 上构建未签名 IPA，供 AltStore / Sideloadly / SideStore
+# 用你的免费 Apple ID 签名后安装到 iPhone（有效期 7 天，可自动重签）。
+# 用法：Actions → Sideload → Run workflow，可选填 Team ID（获取完整 App+Widget 数据共享）。
+name: Sideload
+
+on:
+  workflow_dispatch:
+    inputs:
+      team_id:
+        description: "你的 Apple ID Team ID（免费账号；留空则构建无 App Groups 版本——App 可用，Widget 仅显示占位）"
+        required: false
+        default: ""
+
+jobs:
+  build-ipa:
+    name: 构建未签名 IPA
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 按 Team ID 改写 App Groups（如已提供）
+        if: ${{ inputs.team_id != '' }}
+        run: |
+          sed -i '' "s/group\.com\.ctapp\.shared/group.${{ inputs.team_id }}.ctapp.shared/g" \
+            Sources/CTApp/CT.entitlements \
+            Sources/CTWidget/CTWidget.entitlements \
+            Sources/MacroCore/iOS/SwiftDataModels.swift
+          echo "App Group 已改为 group.${{ inputs.team_id }}.ctapp.shared"
+
+      - name: 未提供 Team ID 时移除 App Groups 声明（避免侧载签名失败）
+        if: ${{ inputs.team_id == '' }}
+        run: |
+          for f in Sources/CTApp/CT.entitlements Sources/CTWidget/CTWidget.entitlements; do
+            cat > "$f" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict/>
+</plist>
+EOF
+          done
+          echo "已移除 App Groups（Widget 将显示占位数据；如需完整体验请填 Team ID 重跑）"
+
+      - name: 安装 XcodeGen 并生成工程
+        run: |
+          brew install xcodegen
+          xcodegen --spec project.yml
+
+      - name: 构建（真机架构，不签名）
+        run: |
+          xcodebuild -scheme CTApp \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: 打包 IPA
+        run: |
+          APP_PATH=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" | head -1)
+          echo "打包: $APP_PATH"
+          rm -rf Payload && mkdir Payload
+          cp -R "$APP_PATH" Payload/
+          rm -f CT-unsigned.ipa && zip -qr CT-unsigned.ipa Payload
+
+      - name: 上传 IPA 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: CT-unsigned
+          path: CT-unsigned.ipa
+          retention-days: 7
