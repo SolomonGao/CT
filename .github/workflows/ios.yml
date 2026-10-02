@@ -47,6 +47,10 @@ jobs:
             grep -E "error:" build.out | head -40 | tr -d '\r' | sed 's/%/%25/g' | while IFS= read -r line; do
               echo "::error::${line:0:300}"
             done
+            echo "::error::---- 上下文（最后 25 行）----"
+            tail -25 build.out | tr -d '\r' | sed 's/%/%25/g' | while IFS= read -r line; do
+              echo "::error::${line:0:300}"
+            done
             exit 1
           fi
 
