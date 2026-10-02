@@ -25,9 +25,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ctapp.CT
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_FILE: Sources/CTApp/Info.plist
         # TODO(P1): 实机分发时配置签名与 App Groups：
         #   CODE_SIGN_STYLE: Automatic
         #   DEVELOPMENT_TEAM: <你的 Team ID>
