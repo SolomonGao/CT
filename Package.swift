@@ -3,6 +3,10 @@ import PackageDescription
 
 let package = Package(
     name: "CT",
+    platforms: [
+        .iOS(.v17),
+        .macOS(.v13),
+    ],
     products: [
         // 跨平台核心库：模型、存储协议、进度聚合。iOS App / Widget / CLI / 测试共用。
         .library(name: "MacroCore", targets: ["MacroCore"]),
