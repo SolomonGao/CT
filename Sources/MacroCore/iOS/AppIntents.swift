@@ -40,7 +40,7 @@ struct LogMacroIntent: AppIntent {
 
 /// 打开 App 录入页（Widget"＋"按钮使用）。
 struct OpenLogEntryIntent: AppIntent {
-    static var title: LocalizedStringResource = "记一笔"
+    static var title: LocalizedStringResource { "记一笔" }
 
     func perform() async throws -> some IntentResult {
         // TODO(P1): 深链到 App 的快速录入页（如 ctapp://log）。
