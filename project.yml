@@ -34,7 +34,7 @@ targets:
         #   INFOPLIST_KEY_NSAppGroups: <group.com.ctapp.shared>（或用 entitlements 文件）
 
   CTWidget:
-    type: appExtension
+    type: app-extension
     platform: iOS
     sources:
       - path: Sources/CTWidget
